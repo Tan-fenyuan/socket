@@ -1,0 +1,94 @@
+/*************************************************************************
+        > File Name: client.cpp
+      > Author: tanfenyuan
+      > Mail: tanfenyuan@outlook.com 
+      > Created Time: Thu 26 Jan 2023 08:51:13 PM CST
+ ************************************************************************/
+
+#include"../include/tinyxml2.h"
+#include<iostream>
+#include<string.h>
+#include<sys/types.h>
+#include <sys/stat.h>
+
+#include<unistd.h>
+#include<stdlib.h>
+#include<netdb.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+
+#include <sstream>
+
+using namespace tinyxml2;
+using namespace std;
+void dispose(const char* xml)
+{
+
+	XMLDocument doc;
+	doc.Parse(xml);
+	XMLElement * titleElement = doc.FirstChildElement("name");
+	const char * one = titleElement->GetText();
+	cout<<"name : "<<one<<endl;
+	titleElement = titleElement->FirstChildElement("message");
+	XMLText * textNode = titleElement->FirstChild()->ToText();
+	const char* two = textNode->Value();
+	cout<<"message: "<<two<<endl;
+
+
+}
+int main()
+{
+	//客户端
+	int sock;
+	if((sock = socket(AF_INET,SOCK_STREAM,0))==-1)
+	{
+		cerr<<"socket failed"<<endl;
+	}
+	string str;
+	cout<<"请输入IP地址"<<endl;
+	cin>>str;
+	cout<<str<<endl;
+	struct hostent*h;
+	if((h = gethostbyname(str.c_str()))==0)
+	{
+		cerr<<"gethostbyname failed "<<endl;
+		close(sock);
+		return -1;
+	}
+	struct sockaddr_in serv_addr;
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(5000);//设置为5000端口,因为云控制平台只开放了5000端口
+	memcpy(&serv_addr.sin_addr,h->h_addr,h->h_length);
+	if(connect(sock,(struct sockaddr*)&serv_addr,sizeof(serv_addr))!=0)
+	{
+		cerr<<"connect failed"<<endl;
+		close(sock);
+		return -1;
+	}
+	string buffer;
+	for(int i =0;i<10;++i)
+	{
+		std::ostringstream ostr;
+		ostr<<"<name>tfy<message>"<<"这是第"<<i<<"个超级女生</message></name>";
+		buffer = ostr.str();
+		if(send(sock,buffer.c_str(),buffer.size(),0)<=0)
+		{
+			cerr<<"send failed"<<endl;
+			break;
+		}
+		cout<<"发送"<<buffer<<endl;
+		
+		char recv_buffer[1024];
+		memset(recv_buffer,0,sizeof(recv_buffer));
+		if(recv(sock,recv_buffer,sizeof(recv_buffer),0)<=0)
+		{
+			break;
+		}
+		//将服务端传回的xml进行解析
+		dispose(recv_buffer);
+
+	}
+	close(sock);
+	return 0;
+
+}

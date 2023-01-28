@@ -1,0 +1,98 @@
+/*************************************************************************
+        > File Name: server.cpp
+      > Author: tanfenyuan
+      > Mail: tanfenyuan@outlook.com 
+      > Created Time: Thu 26 Jan 2023 11:30:15 PM CST
+ ************************************************************************/
+#include"../include/tinyxml2.h"
+
+#include<iostream>
+#include<string.h>
+#include<unistd.h>
+#include<stdlib.h>
+#include<netdb.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+
+#include<sstream>
+using namespace tinyxml2;
+using namespace std;
+void dispose(const char* xml)
+{
+	XMLDocument  doc;
+	doc.Parse(xml);
+
+	XMLElement* name = doc.FirstChildElement("name");
+	const char* one = name->GetText();
+	cout<<"name: "<<one<<endl;
+	name = name->FirstChildElement("message");
+	XMLText* message = name->FirstChild()->ToText();
+	const char* two  =message->Value();
+	cout<<"message : "<<two<<endl;
+
+}
+int main()
+{
+	//监听
+	int listend_d;
+	if((listend_d = socket(AF_INET,SOCK_STREAM,0))==-1)
+	{
+		cerr<<"Socket"<<endl;
+		return -1;
+	}
+	struct sockaddr_in serv_addr;
+	memset(&serv_addr,0,sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);//接受所有的客户端连接
+	serv_addr.sin_port = htons(5000);//写死端口
+	
+	//绑定
+	if(bind(listend_d,(struct sockaddr*)&serv_addr,sizeof(serv_addr))!=0)
+	{
+		cerr<<"bind failed"<<endl;
+		close(listend_d);
+		return -1;
+	}
+	if(listen(listend_d,5)!=0)
+	{
+		cerr<<"listen "<<endl;
+		close(listend_d);
+		return -1;
+	}
+
+
+
+	//--------------------------------------------------
+	int client_d;//客户端
+	int sock_len = sizeof(struct sockaddr_in);
+
+	struct sockaddr_in client_addr;
+	client_d = accept(listend_d,(struct sockaddr*)&client_addr,(socklen_t*)&sock_len);
+
+	cout<<"客户端"<<inet_ntoa(client_addr.sin_addr)<<endl;
+
+	char buffer[1024];
+	while(true)
+	{
+		memset(buffer,0,sizeof(buffer));
+		if(recv(client_d,buffer,sizeof(buffer),0)<=0)
+		{
+			break;
+		}
+		//丢给xml处理函数去处理
+		dispose(buffer);
+		std::ostringstream ostr;
+		ostr<<"<name>server<message>OK</message></name>";
+		string ss = ostr.str();
+		if(send(client_d,ss.c_str(),ss.size(),0)<=0)
+		{
+			cerr<<"send failed"<<endl;
+			break;
+		}
+	}
+	close(listend_d);
+	close(client_d);
+	return 0;
+}
+
